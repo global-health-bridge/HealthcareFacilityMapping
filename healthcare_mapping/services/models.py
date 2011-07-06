@@ -1,13 +1,8 @@
+from django.contrib.auth.models import User
 from django.contrib.gis.db import models
 import datetime
 
 # Create your models here.
-
-class User(models.User):
-	plus = models.IntegerField(default=0)
-	
-	def is_trustworthy(self):
-		return plus > 30 # TODO: change this when sure
 
 class FacilityType(models.Model):
 	name = models.CharField(max_length=128)

@@ -1,11 +1,11 @@
 from django_restapi.model_resource import Collection
 from django_restapi.resource import Resource
 from django_restapi.responder import JSONResponder
-from django_restapi.authentication import HttpDigestAuthentication
+from django_restapi.authentication import HttpBasicAuthentication
 from django.contrib.gis.geos import Point
-from models import Facility, Submission, User, FacilityType
+from models import Facility, Submission, FacilityType
 
-class FacilityCollection(Resource):
+class FacilityCollection(Collection):
 	def read(self,request):
 		pass
 	
@@ -15,7 +15,7 @@ class FacilityCollection(Resource):
 	def search_by_profile(self,field,condition):
 		pass
 	
-class SubmissionCollection(Resource):
+class SubmissionCollection(Collection):
 	def create(self,request):
 		submission = self.save_submission(request)
 		return self.create_or_update_facility(submission)
@@ -52,13 +52,6 @@ class SubmissionCollection(Resource):
 		pass
 		# TODO: get nearby submissions to determine duplicates by comparing name and submitter
 
-user_resource = Collection(
-		queryset = User.objects.all(),
-		permitted_methods = ('GET','POST','PUT'),
-		responder = JSONResponder(),
-		authentication = HttpDigestAuthentication(),
-	)
-
 facility_resource = FacilityCollection(
 		queryset = Facility.objects.all(),
 		permitted_methods = ('GET'),
@@ -69,5 +62,5 @@ submission_resource = SubmissionCollection(
 		queryset = Submission.objects.all(),
 		permitted_methods = ('GET','PUT'),
 		responder = JSONResponder(paginate_by = 10),
-		authentication = HttpDigestAuthentication(),
+		authentication = HttpBasicAuthentication(),
 	)

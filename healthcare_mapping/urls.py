@@ -8,7 +8,7 @@ admin.autodiscover()
 urlpatterns = patterns('',
     # Example:
     # (r'^healthcare_mapping/', include('healthcare_mapping.foo.urls')),
-	(r'^/services/',include('healthcare_mapping.services.urls')),
+	(r'^services/',include('healthcare_mapping.services.urls')),
 
     # Uncomment the admin/doc line below to enable admin documentation:
     (r'^admin/doc/', include('django.contrib.admindocs.urls')),

@@ -3,17 +3,36 @@ from django_restapi.resource import Resource
 from django_restapi.responder import JSONResponder
 from django_restapi.authentication import HttpBasicAuthentication
 from django.contrib.gis.geos import Point
+from django.contrib.gis.measure import D
 from models import Facility, Submission, FacilityType
+import logging
+import json
 
 class FacilityCollection(Collection):
-	def read(self,request):
-		pass
+	FILTERS = { # add new search functions here
+			'distance':(self.search_by_distance,('lat','long')),
+			'profile':(self.search_by_profile,('conditions')),
+		}	
 	
-	def search_by_distance(self,location,distance):
-		pass
+	def read(self,request):
+		filter = request.GET.get('filter',None)
+		try:
+			function, args = FILTERS[filter]
+			return function(*request.GET.get(arg,None) for arg in args)
+		except KeyError:
+			logging.warning('User tried to search by invalid filter '+filter)
 		
-	def search_by_profile(self,field,condition):
-		pass
+	def search_by_distance(self,lat,long):
+		"""
+		Takes a JSON tuple of coordinates and distance in *kilometers*
+		"""
+		return Facility.objects.distance(Point(float(lat),float(long))).order_by('distance')
+		
+	def search_by_profile(self,conditions):
+		"""
+		Takes a JSON object that maps the fields to their respective restriction
+		"""
+		return Facility.objects.get(**json.loads(conditions))
 	
 class SubmissionCollection(Collection):
 	def create(self,request):
@@ -29,38 +48,54 @@ class SubmissionCollection(Collection):
 		
 		def get_location(request):
 			try:
-				return Point(request.POST['lat'],request.POST['long'])
+				return Point(float(request.POST['lat']),float(request.POST['long']))
 			except KeyError:
+				logging.debug('Coordinates are not provided. Using Google Map API to infer them from address.')
 				pass # TODO: log missing location, run mapapi with address
-
+		
 		submit_args = {
 				'submitter':request.user,
 				'raw':repr(request.POST),
-				'name':request.POST.get('name',''),
-				'address':request.POST.get('address',''),
+				'name':request.POST.get('name',None),
+				'address':request.POST.get('address',None),
 			}
 		type = get_type(request)
 		if type: submit_args['type'] = type
 		location = get_location(request)
 		if location: submit_args['location'] = location
+		return Submission(**submit_args).save()
 		
-		submission = Submission(**submit_args)
-		submission = Submission.save()
-		return submission
-		
-	def create_or_update_facility(self,submission):
-		pass
-		# TODO: get nearby submissions to determine duplicates by comparing name and submitter
+	def create_or_update_facility(self,submission,distance_threshold=1):
+		"""
+		Gets nearby submissions to determine duplicate by comparing name and submitter
+		If the submitted facility already exists, it is updated; if not, it is created
+		"""
+		# get facility/submissions within the set distance (in km)
+		distance_filter = (submission.location,D(km=distance_threshold))
+		try:
+			facility = Facility.objects.filter(location__dwithin=distance_filter).order_by('distance').next()
+			facility.location = Submission.objects.filter(location__dwithin=distance_filter).centroid()
+			for field in 'name address type'.split():
+				new_value = getattr(submission,field,None)
+				existing_value = getattr(facility,field,None)
+				if new_value and not existing_value:
+					# TODO: if a value already exists, select the value with the highest submitter rating
+					setattr(facility,field,getattr(submission,field,None))
+			facility.save()
+		except AttributeError:
+			logging.info('The submission is new')
+			facility_args = {}
+			for field in 'name address type location'.split():
+				facility_args[field] = getattr(submission,field)
+			return Facility(**facility_args).save()
 
 facility_resource = FacilityCollection(
-		queryset = Facility.objects.all(),
 		permitted_methods = ('GET'),
 		responder = JSONResponder(paginate_by = 10),
 	)
 	
 submission_resource = SubmissionCollection(
-		queryset = Submission.objects.all(),
-		permitted_methods = ('GET','PUT'),
+		permitted_methods = ('GET','POST','PUT'),
 		responder = JSONResponder(paginate_by = 10),
 		authentication = HttpBasicAuthentication(),
 	)

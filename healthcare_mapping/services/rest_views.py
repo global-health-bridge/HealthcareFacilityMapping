@@ -5,13 +5,14 @@ from django_restapi.authentication import HttpBasicAuthentication
 from django.contrib.gis.geos import Point
 from django.contrib.gis.measure import D
 from models import Facility, Submission, FacilityType
+from web_services import GoogleMapServices
 import logging
 import json
 
 class FacilityCollection(Collection):
 	FILTERS = { # add new search functions here
-			'distance':(self.search_by_distance,('lat','long')),
-			'profile':(self.search_by_profile,('conditions')),
+			'distance':(self._search_by_distance,('lat','long')),
+			'profile':(self._search_by_profile,('conditions')),
 		}	
 	
 	def read(self,request):
@@ -22,13 +23,13 @@ class FacilityCollection(Collection):
 		except KeyError:
 			logging.warning('User tried to search by invalid filter '+filter)
 		
-	def search_by_distance(self,lat,long):
+	def _search_by_distance(self,lat,long):
 		"""
 		Takes a JSON tuple of coordinates and distance in *kilometers*
 		"""
 		return Facility.objects.distance(Point(float(lat),float(long))).order_by('distance')
 		
-	def search_by_profile(self,conditions):
+	def _search_by_profile(self,conditions):
 		"""
 		Takes a JSON object that maps the fields to their respective restriction
 		"""
@@ -36,10 +37,10 @@ class FacilityCollection(Collection):
 	
 class SubmissionCollection(Collection):
 	def create(self,request):
-		submission = self.save_submission(request)
-		return self.create_or_update_facility(submission)
+		submission = self._save_submission(request)
+		return self._create_or_update_facility(submission)
 		
-	def save_submission(self,request):
+	def _save_submission(self,request):
 		def get_type(request):
 			try:
 				return FacilityType.objects.get(name=request.POST['type'])
@@ -48,10 +49,14 @@ class SubmissionCollection(Collection):
 		
 		def get_location(request):
 			try:
-				return Point(float(request.POST['lat']),float(request.POST['long']))
+				return Point(float(request.POST['long']),float(request.POST['lat']))
 			except KeyError:
 				logging.debug('Coordinates are not provided. Using Google Map API to infer them from address.')
-				pass # TODO: log missing location, run mapapi with address
+				try:
+					with GoogleMapServices() as service:
+						return Point(*services.get_coordinates(request.POST['address']))
+				except KeyError:
+					logging.error('Both coordinates and address are missing')
 		
 		submit_args = {
 				'submitter':request.user,
@@ -65,7 +70,7 @@ class SubmissionCollection(Collection):
 		if location: submit_args['location'] = location
 		return Submission(**submit_args).save()
 		
-	def create_or_update_facility(self,submission,distance_threshold=1):
+	def _create_or_update_facility(self,submission,distance_threshold=1):
 		"""
 		Gets nearby submissions to determine duplicate by comparing name and submitter
 		If the submitted facility already exists, it is updated; if not, it is created

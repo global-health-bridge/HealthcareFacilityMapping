@@ -25,7 +25,7 @@ class Submission(models.Model):
 	submitter = models.ForeignKey(User)
 	datetime = models.DateTimeField('Submission datetime',default=datetime.datetime.now())
 	raw = models.TextField('Raw request')
-	name = models.CharField(max_length=128)
+	name = models.CharField(max_length=128,null=True)
 	type = models.ForeignKey(FacilityType,null=True)
 	address = models.TextField(null=True)
 	location = models.PointField(srid=4326,geography=True,null=True)

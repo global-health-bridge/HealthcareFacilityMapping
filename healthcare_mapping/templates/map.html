@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<!-- TODO: move js and css to their own files -->
+<html>
+	<head>
+		<meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+		<style>
+			body {font-family: sans-serif}
+			#map {width: 800px; height: 500px}
+		</style>
+	</head>
+	<body>
+		<div id="header"></div>
+		<div id="information"></div>
+		<div id="map"></div>
+		<div id="facility"></div>
+		
+		<script src="http://maps.google.com/maps/api/js?sensor=false"></script>
+		<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.5.1/jquery.js"></script>
+		<script>
+			var initialize = function(){
+				var map = new google.maps.Map(document.getElementById('map'),{
+					zoom: 10,
+					center: new google.maps.LatLng(55.897, -3.144), // TODO: detect user location
+					mapTypeId: google.maps.MapTypeId.TERRAIN
+				});
+			}
+			var get_facility = function(){
+				console.log('Run Ajax Call To Get Nearby Facilities')
+			}
+			$(document).ready(initialize);
+		</script>
+	</body>
+</html>

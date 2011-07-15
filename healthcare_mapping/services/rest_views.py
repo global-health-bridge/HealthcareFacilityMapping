@@ -4,36 +4,26 @@ from django_restapi.responder import JSONResponder
 from django_restapi.authentication import HttpBasicAuthentication
 from django.contrib.gis.geos import Point
 from django.contrib.gis.measure import D
-from models import Facility, Submission, FacilityType
-from web_services import GoogleMapServices
+from models import Facility, Submission, FacilityType, User
+from web_services import GoogleMapService
 import logging
 import json
 
-class FacilityCollection(Collection):
-	FILTERS = { # add new search functions here
-			'distance':(self._search_by_distance,('lat','long')),
-			'profile':(self._search_by_profile,('conditions')),
-		}	
-	
-	def read(self,request):
-		filter = request.GET.get('filter',None)
+def get_location(request):
+	try:
+		return Point(float(request.POST['long']),float(request.POST['lat']))
+	except KeyError:
+		logging.debug('Coordinates are not provided. Using Google Map API to infer them from address.')
 		try:
-			function, args = FILTERS[filter]
-			return function(*request.GET.get(arg,None) for arg in args)
+			with GoogleMapService() as service:
+				return Point(*services.get_coordinates(request.POST['address']))
 		except KeyError:
-			logging.warning('User tried to search by invalid filter '+filter)
-		
-	def _search_by_distance(self,lat,long):
-		"""
-		Takes a JSON tuple of coordinates and distance in *kilometers*
-		"""
-		return Facility.objects.distance(Point(float(lat),float(long))).order_by('distance')
-		
-	def _search_by_profile(self,conditions):
-		"""
-		Takes a JSON object that maps the fields to their respective restriction
-		"""
-		return Facility.objects.get(**json.loads(conditions))
+			logging.error('Both coordinates and address are missing')
+
+class FacilityCollection(Collection):
+	def read(self,request):
+		location = get_location(request)
+		return Facility.objects.distance(location)
 	
 class SubmissionCollection(Collection):
 	def create(self,request):
@@ -46,17 +36,6 @@ class SubmissionCollection(Collection):
 				return FacilityType.objects.get(name=request.POST['type'])
 			except KeyError:
 				return None
-		
-		def get_location(request):
-			try:
-				return Point(float(request.POST['long']),float(request.POST['lat']))
-			except KeyError:
-				logging.debug('Coordinates are not provided. Using Google Map API to infer them from address.')
-				try:
-					with GoogleMapServices() as service:
-						return Point(*services.get_coordinates(request.POST['address']))
-				except KeyError:
-					logging.error('Both coordinates and address are missing')
 		
 		submit_args = {
 				'submitter':request.user,
@@ -78,15 +57,18 @@ class SubmissionCollection(Collection):
 		# get facility/submissions within the set distance (in km)
 		distance_filter = (submission.location,D(km=distance_threshold))
 		try:
-			facility = Facility.objects.filter(location__dwithin=distance_filter).order_by('distance').next()
-			facility.location = Submission.objects.filter(location__dwithin=distance_filter).centroid()
-			for field in 'name address type'.split():
-				new_value = getattr(submission,field,None)
-				existing_value = getattr(facility,field,None)
-				if new_value and not existing_value:
-					# TODO: if a value already exists, select the value with the highest submitter rating
-					setattr(facility,field,getattr(submission,field,None))
-			facility.save()
+			for facility in Facility.objects.filter(location__dwithin=distance_filter).order_by('distance'):
+				if not facility.name or facility.name == submission.name: # TODO: use proper string comparison function
+					for field in 'name address type'.split():
+						new_value = getattr(submission,field,None)
+						existing_value = getattr(facility,field,None)
+						if new_value and not existing_value:
+							# currently keeps existing value
+							# TODO: if a value already exists, select the value with the highest submitter rating
+							setattr(facility,field,getattr(submission,field,None))
+					facility.location = Submission.objects.filter(location__dwithin=distance_filter).centroid()
+					facility.save()
+					break
 		except AttributeError:
 			logging.info('The submission is new')
 			facility_args = {}
@@ -95,11 +77,13 @@ class SubmissionCollection(Collection):
 			return Facility(**facility_args).save()
 
 facility_resource = FacilityCollection(
+		queryset = Facility.objects.all(),
 		permitted_methods = ('GET'),
 		responder = JSONResponder(paginate_by = 10),
 	)
 	
 submission_resource = SubmissionCollection(
+		queryset = Submission.objects.all(),
 		permitted_methods = ('GET','POST','PUT'),
 		responder = JSONResponder(paginate_by = 10),
 		authentication = HttpBasicAuthentication(),

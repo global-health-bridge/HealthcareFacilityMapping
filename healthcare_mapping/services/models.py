@@ -15,11 +15,12 @@ class Facility(models.Model):
 	type = models.ForeignKey(FacilityType)
 	validated = models.BooleanField(default=False)
 	address = models.TextField(null=True)
+	phone = models.PositiveSmallIntegerField(null=True)
 	location = models.PointField(srid=4326,geography=True)
 	objects = models.GeoManager()
 	
 	def __unicode__(self):
-		return ' '.join((self.type, self.location.x, self.location.y))
+		return ' '.join((self.type, self.location.y, self.location.x)) # lat, long
 
 class Submission(models.Model):
 	submitter = models.ForeignKey(User)
@@ -28,6 +29,7 @@ class Submission(models.Model):
 	name = models.CharField(max_length=128,null=True)
 	type = models.ForeignKey(FacilityType,null=True)
 	address = models.TextField(null=True)
+	phone = models.PositiveSmallIntegerField(null=True)
 	location = models.PointField(srid=4326,geography=True,null=True)
 	objects = models.GeoManager()
 	

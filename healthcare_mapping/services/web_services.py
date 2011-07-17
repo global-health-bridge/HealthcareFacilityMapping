@@ -1,4 +1,5 @@
 from urllib2 import build_opener, Request
+from urllib import quote
 import logging
 import json
 
@@ -20,21 +21,26 @@ class WebService(object):
 	def make_request(self,path,data=None):
 		if not self.SERVER:
 			raise Exception, 'Server not set.'
-		request = Request('{0}/{1}?{2}'.format(self.SERVER,path,data))
-		return self._connect.open(request)
+		url = '{0}/{1}?{2}'.format(self.SERVER,path,data)
+		logging.debug(url)
+		return self._connect.open(Request(url),timeout=120)
 	
 class GoogleMapService(WebService):
 	"""
 	Talks to the Google Map Web Services
 	"""
-	SERVER = 'maps.googeapis.com'
+	SERVER = 'http://maps.googleapis.com'
 	GEOCODE = 'maps/api/geocode/json'
 	
 	def get_coordinates(self,address):
-		data = 'address='+address
+		data = 'address={0}&sensor=false'.format(quote(address))
 		try:
-			response = json.loads(self.make_request(self.GEOCODE,data=data).read())
+			raw_response = self.make_request(self.GEOCODE,data=data).read()
+			logging.debug(raw_response)
+			response = json.loads(raw_response)
 			location = response['results'][0]['geometry']['location']
 			return location['lng'],location['lat']
 		except IndexError:
 			logging.error('No results recieved')
+		# except ValueError:
+			# logging.error('Request failed')

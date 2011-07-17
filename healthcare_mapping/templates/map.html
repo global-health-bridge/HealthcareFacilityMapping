@@ -1,33 +1,198 @@
 <!DOCTYPE html>
-<!-- TODO: move js and css to their own files -->
 <html>
 	<head>
+		<title>Healthcare Facility Map</title>
 		<meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
-		<style>
-			body {font-family: sans-serif}
-			#map {width: 800px; height: 500px}
-		</style>
 	</head>
 	<body>
-		<div id="header"></div>
-		<div id="information"></div>
+		<div id="search">
+			<input id="searchInput" type="text" value placeholder="Address or Area Name"></input>
+			<button id="searchButton">Search</button>
+		</div>
 		<div id="map"></div>
-		<div id="facility"></div>
-		
+		<div id="information">
+			<label>Facility Information</label>
+			<div id="infoForm">
+				<div id="basic">
+					<button id="basicToggle">Basic</button>
+					<form>
+						<label for="nameInput">Name</label>
+						<input id="nameInput" type="text"></input>
+						<label for="typeInput">Type</label>
+						<select id="typeInput">
+						{% for type in types %}
+							<option value="{{type.name}}">{{type.name}}</option>
+						{% endfor %}
+						</select>
+						<label for="addressInput">Address</label>
+						<input id="addressInput" type="text"></input>
+						<label for="phoneInput">Phone</label>
+						<input id="nameInput" type="text"></input>
+						<label for="latInput">Latitude</label>
+						<input id="latInput" type="text" readonly="true"></input>
+						<label for="longInput">Longitude</label>
+						<input id="longInput" type="text" readonly="true"></input>
+					</form>
+				</div>
+				<div id="Profile">
+					<button id="profileToggle">Profile</button>
+					<form">
+					</form>
+				</div>
+				<div id="Complete">
+					<button id="completeToggle">Complete</button>
+					<form>
+					</form>
+				</div>
+			</div>
+			<button id="submitButton">Submit</button>
+		</div>
+		<!-- TODO move all the styling and scripts to own file-->
+		<style>
+			body {
+				font-family:sans-serif;
+			}
+			#map {
+				width:60%;
+				height:500px;
+				float:left;
+			}
+			#information{
+				background:lightblue;
+				width:20%;
+				float:right;
+			}
+			#infoForm{
+				background:lightcyan;
+			}
+			#infoForm label{
+				float:left;
+			}
+			#infoForm input, select{
+				display:block;
+			}
+			#searchInput{
+				display:inline-block;
+			}
+		</style>
 		<script src="http://maps.google.com/maps/api/js?sensor=false"></script>
 		<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.5.1/jquery.js"></script>
 		<script>
-			var initialize = function(){
-				var map = new google.maps.Map(document.getElementById('map'),{
+			var map;
+			var facilities;
+			
+			var initializeMap = function(){
+				map = new google.maps.Map(document.getElementById('map'),{
 					zoom: 10,
-					center: new google.maps.LatLng(55.897, -3.144), // TODO: detect user location
+					center: new google.maps.LatLng({{center.0}}, {{center.1}}), // TODO: detect user location
 					mapTypeId: google.maps.MapTypeId.TERRAIN
 				});
 			}
-			var get_facility = function(){
-				console.log('Run Ajax Call To Get Nearby Facilities')
+			
+			var setMarkers = function(){
+				for (facility in facilties){
+					var marker = new google.maps.Marker({
+						title:facility.name,
+						map:map,
+						position:new google.maps.LatLng(facility.location.y,facility.location.x),
+						click:function(){
+							$('#nameInput').attr('value') = facility.name;
+							$('#addressInput').attr('value') = facility.address;
+							$('#typeInput').attr('value') = facility.type;
+							$('#phoneInput').attr('value') = facility.phone;
+							$('#longInput').attr('value') = facility.long;
+							$('#latInput').attr('value') = facility.lat;
+						}
+					});
+				}
 			}
-			$(document).ready(initialize);
+			
+			var SearchRequest = {
+				getData:function(searchAddr){
+					if (searchAddr){
+						return{
+							'address':$('#searchInput').attr('value')
+						};
+					}
+					else{
+						return{
+							'long':map.center.lng,
+							lat:map.center.lat
+						};
+					}
+				},
+				makeRequest:function(searchAddr){
+					$.ajax({
+						url:'/services/restful/facility/',
+						data:this.getData(searchAddr),
+						type:'GET',
+						dataType:'json',
+						success:this.succeed,
+						error:this.failed
+					});
+				},
+				succeed:function(response){
+					console.log('Success!');
+					facilities = response;
+					setMarkers();
+					map.panTo(new google.maps.LatLng(lat,lng)); // TODO: get center
+				},
+				failed:function(response){
+					console.error('Could not get result');
+				}
+			}
+			
+			var SubmitRequest = {
+				getData:function(){
+					return{
+						name:$('#nameInput').attr('value'),
+						address:$('#addressInput').attr('value'),
+						type:$('#typeInput').attr('value'),
+						phone:$('#phoneInput').attr('value'),
+						'long':$('#longInput').attr('value'),
+						lat:$('#latInput').attr('value')
+					};
+				},
+				makeRequest:function(){
+					$.ajax({
+						url:'/services/restful/submission/',
+						data:this.getData(),
+						type:'POST',
+						dataType:'json',
+						success:this.succeed,
+						error:this.failed
+					});
+				},
+				succeed:function(response){
+					console.log('Success!');
+					// TODO: display success dialog
+				},
+				failed:function(response){
+					console.error('Could not save result');
+				}
+			}
+			
+			
+			$(document).ready(function(){
+				initializeMap();
+				$('#submitButton').click(function(){
+					request = SubmitRequest();
+					request.makeRequest();
+				});
+				$('#searchButton').click(function(){
+					request = SearchRequest();
+					request.makeRequest(true);
+				});
+				$('#basicToggle').click(function(){
+					$('#basic form').toggle();
+				});
+				$('#profileToggle').click(function(){
+					$('#profile form').toggle();
+				});
+				$('#completeToggle').click(function(){
+					$('#complete form').toggle();
+				});
+			});
 		</script>
 	</body>
 </html>

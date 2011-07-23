@@ -34,6 +34,9 @@ class SubmissionCollection(Collection):
 		facility = self._create_or_update_facility(submission)
 		return self.responder.list(request,facility)
 		
+	def update(self,request):
+		return self.create(request)
+		
 	def _save_submission(self,request):
 		def get_type(request):
 			try:
@@ -80,7 +83,7 @@ class SubmissionCollection(Collection):
 
 facility_resource = FacilityCollection(
 		queryset = Facility.objects.all(),
-		permitted_methods = ('GET','POST'),
+		permitted_methods = ['GET'],
 		responder = JSONResponder(paginate_by = 10),
 	)
 	

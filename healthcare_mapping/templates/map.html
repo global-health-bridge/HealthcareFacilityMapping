@@ -26,7 +26,6 @@
 						</select>
 						<label for="addressInput">Address</label>
 						<input id="addressInput" type="text"></input>
-						<label for="phoneInput">Phone</label>
 						<input id="nameInput" type="text"></input>
 						<label for="latInput">Latitude</label>
 						<input id="latInput" type="text" readonly="true"></input>
@@ -86,9 +85,9 @@
 		<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.5.1/jquery.js"></script>
 		<script>
 			var map;
-			var facilities;
+			var facilities = new Array();
 			var geocoder;
-			var unsaved;
+			var unsaved = new Array();
 			
 			var initializeMap = function(){
 				map = new google.maps.Map(document.getElementById('map'),{
@@ -104,7 +103,6 @@
 					$('#nameInput').val(facility.name);
 					$('#addressInput').val(facility.address);
 					$('#typeInput').val(facility.type);
-					$('#phoneInput').val(facility.phone);
 				}
 				$('#longInput').val(location.lng());
 				$('#latInput').val(location.lat());
@@ -116,7 +114,6 @@
 						name:$('#nameInput').val(),
 						address:$('#addressInput').val(),
 						type:$('#typeInput').val(),
-						phone:$('#phoneInput').val(),
 						'long':$('#longInput').val(),
 						lat:$('#latInput').val()
 					};
@@ -140,15 +137,17 @@
 			}
 			
 			var placeFacility = function(location){
-				createMarker(false,location);
-				selectFacility(false,location);
+				createMarker(null,location);
+				selectFacility(null,location);
 			}
 			
-			var setMarkers = function(){
-				for (facility in facilties){
-					position = new google.maps.LatLng(facility.location.y,facility.location.x);
+			var setMarkers = function(results){
+				for (index in results){
+					facility = results[index];
+					position = new google.maps.LatLng(facility.lat,facility['long']);
 					facility.marker = createMarker(facility,position);
 				}
+				return results;
 			}
 			
 			var geoCode = function(address){
@@ -183,9 +182,8 @@
 					});
 				},
 				succeed:function(response){
+					facilities = setMarkers(response);
 					console.log('Success!');
-					facilities = response;
-					setMarkers();
 				},
 				failed:function(response){
 					console.error('Could not get result');
@@ -204,16 +202,16 @@
 					});
 				},
 				succeed:function(response){
-					console.log('Success!');
 					// TODO: display success message
-					var facility = this.getData();
+					var facility = getFacility();
 					for (marker in unsaved){
 						if (marker.getLocation() == new google.maps.LatLng(facility.lat,facility['long']))
 						{
 							facility.marker = marker;
 						}
 					}
-					facilities += facility;					
+					facilities += facility;
+					console.log('Success!');
 				},
 				failed:function(response){
 					console.error('Could not save result');

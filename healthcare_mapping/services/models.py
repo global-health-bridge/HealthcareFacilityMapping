@@ -15,7 +15,6 @@ class Facility(models.Model):
 	type = models.ForeignKey(FacilityType)
 	validated = models.BooleanField(default=False)
 	address = models.TextField(null=True)
-	phone = models.PositiveSmallIntegerField(null=True)
 	location = models.PointField(srid=4326,geography=True)
 	objects = models.GeoManager()
 	
@@ -29,7 +28,6 @@ class Submission(models.Model):
 	name = models.CharField(max_length=128,null=True)
 	type = models.ForeignKey(FacilityType,null=True)
 	address = models.TextField(null=True)
-	phone = models.PositiveSmallIntegerField(null=True)
 	location = models.PointField(srid=4326,geography=True,null=True)
 	objects = models.GeoManager()
 	
